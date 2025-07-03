@@ -63,7 +63,7 @@ set(SYSREPO_DEP_VERSION 2.2.58)
 set(SYSREPO_DEP_SOVERSION 7.14.18)
 set(SYSREPO_DEP_SOVERSION_MAJOR 7)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c99")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall -Wextra -std=c99")
 
 #
 # options
@@ -249,7 +249,9 @@ use_compat()
 
 # netopeer2-server
 add_library(serverobj OBJECT ${SERVER_SRC})
-add_executable(netopeer2-server $<TARGET_OBJECTS:serverobj> src/main.c ${compatsrc})
+add_library(np2srv SHARED $<TARGET_OBJECTS:serverobj> ${compatsrc} src/netopeer2-server-startup.c)
+add_executable(netopeer2-server src/main.c)
+target_link_libraries(netopeer2-server np2srv)
 
 #
 # dependencies
