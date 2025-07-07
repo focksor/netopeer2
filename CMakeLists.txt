@@ -249,9 +249,9 @@ use_compat()
 
 # netopeer2-server
 add_library(serverobj OBJECT ${SERVER_SRC})
-add_library(np2srv SHARED $<TARGET_OBJECTS:serverobj> ${compatsrc} src/netopeer2-server-startup.c)
+add_library(np2srv-startup SHARED $<TARGET_OBJECTS:serverobj> ${compatsrc} src/netopeer2-server-startup.c)
 add_executable(netopeer2-server src/main.c)
-target_link_libraries(netopeer2-server np2srv)
+target_link_libraries(netopeer2-server np2srv-startup)
 
 #
 # dependencies
@@ -351,7 +351,8 @@ install(DIRECTORY "${PROJECT_SOURCE_DIR}/modules/" DESTINATION ${YANG_MODULE_DIR
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/scripts/" DESTINATION ${SCRIPT_DIR} USE_SOURCE_PERMISSIONS)
 
 # install the binary, required modules, and default configuration
-install(TARGETS np2srv DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS np2srv-startup DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${PROJECT_SOURCE_DIR}/src/netopeer2-server-startup.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS netopeer2-server DESTINATION ${CMAKE_INSTALL_SBINDIR})
 install(FILES ${PROJECT_SOURCE_DIR}/doc/netopeer2-server.8 DESTINATION ${CMAKE_INSTALL_MANDIR}/man8)
 if(NP2SRV_HAVE_SYSTEMD)

@@ -21,11 +21,11 @@ int
 main(int argc, char *argv[])
 {
     int ret = EXIT_SUCCESS;
-    np2srv_opts opts = { 0 };
+    np2srv_opts_t opts = { 0 };
 
     if ((ret = np2srv_parse_options(argc, argv, &opts)) != EXIT_SUCCESS) {
         return ret;
     }
     return np2srv_startup(&opts, true,
-                          NULL, true, true);
+                          NULL, true, true, NULL);
 }

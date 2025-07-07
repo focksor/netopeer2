@@ -7,9 +7,10 @@
  *  so that it can be used in other projects.
  */
 
+#define _GNU_SOURCE
 #include "netopeer2-server-startup.h"
 
-#if 1 /* Source code from main.c(unchanged) */
+#if 1 /* Source code from main.c */
 
 #define _GNU_SOURCE
 
@@ -1105,7 +1106,7 @@ print_usage(char *progname)
     fprintf(stdout, "\n");
 }
 
-#endif /* Source code from main.c(unchanged) */
+#endif /* Source code from main.c */
 
 #if 1 /* Source code that export APIs */
 
@@ -1149,18 +1150,17 @@ void np2srv_set_signal_handler(void)
     sigaction(SIGPIPE, &action, NULL);
 }
 
-int np2srv_parse_options(int argc, char *argv[], np2srv_opts *opts)
+int np2srv_parse_options(int argc, char *argv[], np2srv_opts_t *opts)
 {
     int c;
     int daemonize = 1, verb = 0;
-    const char *pidfile = NP2SRV_PID_FILE_PATH;
+    char *pidfile = NP2SRV_PID_FILE_PATH;
     struct passwd *pwd;
     struct group *grp;
     char *ptr;
 
     // set default values
     opts->daemonize = daemonize;
-    opts->verbose = verb;
     opts->pidfile = pidfile;
 
     /* process command line options */
@@ -1322,7 +1322,7 @@ int np2srv_parse_options(int argc, char *argv[], np2srv_opts *opts)
 }
 
 
-static void np2srv_cleanup(char *pidfile)
+static void np2srv_cleanup(const char *pidfile)
 {
     VRB("Server terminated.");
 
@@ -1333,19 +1333,34 @@ static void np2srv_cleanup(char *pidfile)
     server_destroy();
 }
 
-int np2srv_startup(np2srv_opts *opts, bool set_signal_handler,
-                   np2srv_worker_starter_func worker_starter,
-                   bool send_sd_ready, bool occupy_this_thread)
+void np2srv_work_on_this_thread(int index, np2srv_worker_starter_func worker_starter_func)
+{
+    int *idx;
+
+    if (worker_starter_func == NULL) {
+        worker_starter_func = worker_thread;
+    }
+
+    np2srv.workers[index] = pthread_self();
+    idx = malloc(sizeof * idx);
+    *idx = index;
+    worker_starter_func(idx);
+}
+
+int np2srv_startup(np2srv_opts_t *opts, bool set_signal_handler,
+                   np2srv_worker_starter_func worker_starter_func,
+                   bool send_sd_ready, bool occupy_this_thread,
+                   sr_conn_ctx_t **sr_conn)
 {
     int ret = EXIT_SUCCESS;
     int c, *idx, i;
     int pidfd;
     char pid[8];
-    int daemonize = opts->daemonize, verb = opts->verbose;
-    char *pidfile = opts->pidfile;
+    int daemonize = opts->daemonize;
+    const char *pidfile = opts->pidfile;
 
-    if (worker_starter == NULL) {
-        worker_starter = worker_thread;
+    if (worker_starter_func == NULL) {
+        worker_starter_func = worker_thread;
     }
 
     /* until daemonized, write messages to both syslog and stderr */
@@ -1408,6 +1423,9 @@ int np2srv_startup(np2srv_opts *opts, bool set_signal_handler,
         ret = EXIT_FAILURE;
         goto cleanup;
     }
+    if (sr_conn) {
+        *sr_conn = np2srv.sr_conn;
+    }
 
     /* subscribe to sysrepo */
     if (server_rpc_subscribe()) {
@@ -1419,19 +1437,18 @@ int np2srv_startup(np2srv_opts *opts, bool set_signal_handler,
         goto cleanup;
     }
 
-#ifdef NP2SRV_HAVE_SYSTEMD
-    /* notify systemd */
     if (send_sd_ready) {
+#ifdef NP2SRV_HAVE_SYSTEMD
+        /* notify systemd */
         sd_notify(0, "READY=1");
-    }
 #endif
+    }
 
     /* start additional worker threads */
-    for (i = occupy_this_thread ? 0 : 1;
-         i < NP2SRV_THREAD_COUNT + occupy_this_thread ? 1 : 0; ++i) {
+    for (i = 1; i < NP2SRV_THREAD_COUNT; ++i) {
         idx = malloc(sizeof * idx);
         *idx = i;
-        pthread_create(&np2srv.workers[*idx], NULL, worker_starter, idx);
+        pthread_create(&np2srv.workers[*idx], NULL, worker_starter_func, idx);
     }
 
     if (!occupy_this_thread) {
@@ -1439,10 +1456,7 @@ int np2srv_startup(np2srv_opts *opts, bool set_signal_handler,
     }
 
     /* one worker will use this thread */
-    np2srv.workers[0] = pthread_self();
-    idx = malloc(sizeof * idx);
-    *idx = 0;
-    worker_starter(idx);
+    np2srv_work_on_this_thread(0, worker_starter_func);
 
     np2srv_teardown(pidfile, true, false);
 cleanup:
@@ -1450,16 +1464,16 @@ cleanup:
     return ret;
 }
 
-void np2srv_teardown(char *pidfile, bool send_sd_stopping, bool cleanup)
+void np2srv_teardown(const char *pidfile, bool send_sd_stopping, bool cleanup)
 {
     int c, i;
 
-#ifdef NP2SRV_HAVE_SYSTEMD
-    /* notify systemd */
     if (send_sd_stopping) {
+#ifdef NP2SRV_HAVE_SYSTEMD
+        /* notify systemd */
         sd_notify(0, "STOPPING=1");
-    }
 #endif
+    }
 
     /* wait for other worker threads to finish */
     for (i = 1; i < NP2SRV_THREAD_COUNT; ++i) {
