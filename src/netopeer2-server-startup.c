@@ -1350,7 +1350,7 @@ void np2srv_work_on_this_thread(int index, np2srv_worker_starter_func worker_sta
 int np2srv_startup(np2srv_opts_t *opts, bool set_signal_handler,
                    np2srv_worker_starter_func worker_starter_func,
                    bool send_sd_ready, bool occupy_this_thread,
-                   sr_conn_ctx_t **sr_conn)
+                   sr_conn_ctx_t *sr_conn)
 {
     int ret = EXIT_SUCCESS;
     int c, *idx, i;
@@ -1418,13 +1418,13 @@ int np2srv_startup(np2srv_opts_t *opts, bool set_signal_handler,
     ly_set_log_clb(np2log_cb_ly, 1); /* libyang */
     sr_log_set_cb(np2log_cb_sr); /* sysrepo, log level is checked by callback */
 
+    if (sr_conn != NULL) {
+        np2srv.sr_conn = sr_conn;
+    }
     /* initiate NETCONF server */
     if (server_init()) {
         ret = EXIT_FAILURE;
         goto cleanup;
-    }
-    if (sr_conn) {
-        *sr_conn = np2srv.sr_conn;
     }
 
     /* subscribe to sysrepo */

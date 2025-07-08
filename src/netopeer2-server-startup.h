@@ -73,13 +73,14 @@ void np2srv_work_on_this_thread(int index, np2srv_worker_starter_func worker_sta
  * @param [in] worker_starter_func function to start worker threads, set it NULL to use the default one
  * @param [in] send_sd_ready whether to send sd_notify READY=1
  * @param [in] occupy_this_thread whether to occupy this thread as a worker thread
- * @param [out] sr_conn Pointer to a sysrepo connection context, will be set if not NULL
+ * @param [in] sr_conn Pointer to a sysrepo connection context that will used by the server,
+ *  can be NULL and netopeer2-server will create a new one.
  * @return EXIT_SUCCESS on success, EXIT_FAILURE otherwise
  */
 int np2srv_startup(np2srv_opts_t *opts, bool set_signal_handler,
                    np2srv_worker_starter_func worker_starter,
                    bool send_sd_ready, bool occupy_this_thread,
-                   sr_conn_ctx_t **sr_conn);
+                   sr_conn_ctx_t *sr_conn);
 
 /**
  * @brief netopeer2-server teardown
